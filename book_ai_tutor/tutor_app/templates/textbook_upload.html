@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Textbook - Book AI Tutor</title>
+    <link rel="stylesheet" href="{% load static %}{% static 'css/style.css' %}">
+    <style>
+        .upload-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input {
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .upload-btn {
+            background: #007bff;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .upload-btn:hover {
+            background: #0056b3;
+        }
+        
+        .upload-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #28a745;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .status-message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            display: none;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .file-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .requirements {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .requirements h4 {
+            margin: 0 0 10px 0;
+            color: #004085;
+        }
+        
+        .requirements ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .requirements li {
+            margin-bottom: 5px;
+            color: #004085;
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-container">
+        <h1>Upload Educational Textbook</h1>
+        <p>Upload a PDF textbook to extract structured content including chapters, exercises, and questions.</p>
+        
+        <div class="requirements">
+            <h4>Requirements:</h4>
+            <ul>
+                <li>PDF format only</li>
+                <li>Maximum 500 pages</li>
+                <li>Educational content with clear structure</li>
+                <li>Processing may take several minutes for large files</li>
+            </ul>
+        </div>
+        
+        <form class="upload-form" id="uploadForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="title">Textbook Title (Optional)</label>
+                <input type="text" id="title" name="title" placeholder="Enter textbook title or leave blank to use filename">
+            </div>
+            
+            <div class="form-group">
+                <label for="pdf">Select PDF File</label>
+                <input type="file" id="pdf" name="pdf" accept=".pdf" required>
+                <div class="file-info" id="fileInfo" style="display: none;"></div>
+            </div>
+            
+            <button type="submit" class="upload-btn" id="uploadBtn">
+                Upload and Process Textbook
+            </button>
+        </form>
+        
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText">Uploading...</p>
+        </div>
+        
+        <div class="status-message" id="statusMessage"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('uploadForm');
+            const fileInput = document.getElementById('pdf');
+            const fileInfo = document.getElementById('fileInfo');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            // File input change handler
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                    fileInfo.innerHTML = `
+                        <strong>Selected:</strong> ${file.name}<br>
+                        <strong>Size:</strong> ${sizeMB} MB<br>
+                        <strong>Type:</strong> ${file.type}
+                    `;
+                    fileInfo.style.display = 'block';
+                    
+                    // Validate file
+                    if (file.type !== 'application/pdf') {
+                        showStatus('Please select a PDF file.', 'error');
+                        uploadBtn.disabled = true;
+                    } else if (file.size > 100 * 1024 * 1024) { // 100MB limit
+                        showStatus('File size too large. Please select a file under 100MB.', 'error');
+                        uploadBtn.disabled = true;
+                    } else {
+                        hideStatus();
+                        uploadBtn.disabled = false;
+                    }
+                } else {
+                    fileInfo.style.display = 'none';
+                    uploadBtn.disabled = false;
+                }
+            });
+            
+            // Form submission handler
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(form);
+                
+                // Show progress
+                uploadBtn.disabled = true;
+                progressContainer.style.display = 'block';
+                hideStatus();
+                
+                // Simulate upload progress (since we can't track real progress easily)
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 15;
+                    if (progress > 90) progress = 90;
+                    progressFill.style.width = progress + '%';
+                }, 500);
+                
+                // Submit form
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    clearInterval(progressInterval);
+                    progressFill.style.width = '100%';
+                    progressText.textContent = 'Upload complete!';
+                    
+                    if (data.status === 'success') {
+                        showStatus(
+                            `Textbook uploaded successfully! Processing started. You will be redirected to the textbook page.`,
+                            'success'
+                        );
+                        
+                        // Redirect after a short delay
+                        setTimeout(() => {
+                            window.location.href = `/textbook/${data.textbook_id}/`;
+                        }, 2000);
+                    } else {
+                        showStatus('Upload failed: ' + (data.message || 'Unknown error'), 'error');
+                        resetForm();
+                    }
+                })
+                .catch(error => {
+                    clearInterval(progressInterval);
+                    console.error('Upload error:', error);
+                    showStatus('Upload failed. Please try again.', 'error');
+                    resetForm();
+                });
+            });
+            
+            function showStatus(message, type) {
+                statusMessage.textContent = message;
+                statusMessage.className = `status-message status-${type}`;
+                statusMessage.style.display = 'block';
+            }
+            
+            function hideStatus() {
+                statusMessage.style.display = 'none';
+            }
+            
+            function resetForm() {
+                uploadBtn.disabled = false;
+                progressContainer.style.display = 'none';
+                progressFill.style.width = '0%';
+                progressText.textContent = 'Uploading...';
+            }
+        });
+    </script>
+</body>
+</html>
