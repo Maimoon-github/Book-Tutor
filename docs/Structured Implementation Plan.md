@@ -5,13 +5,9 @@ Here's a phased approach to building your agentic AI tutor:
 ### **Phase 1: Data Preparation & Knowledge Base Creation**
 
 1. **Curriculum Ingestion:**
-   * **Identify Source Format:** Are your book units/chapters in PDF, DOCX, HTML, or plain text?
-   * **Extract Raw Text:** Develop scripts to extract all relevant text content from the source files.
-   * **Parse and Structure:** Break down the raw text into logical units (chapters, sections, sub-sections, paragraphs). Identify key terms, definitions, and examples.
-   * **Metadata Tagging:** Manually or semi-automatically tag content with learning objectives, difficulty, and pre-requisites.
+These four files: `Chapter_Reading_matirial.txt`, `Chapters_curriculum.txt`, `book_info.txt`, and `exercises.txt`, are the sourses about the book Curriculum. 
 2. **Initial Knowledge Base Population:**
-   * Store the structured curriculum data in a format accessible to your application (e.g., JSON files, a simple SQLite database, or a vector database if using advanced semantic search).
-   * Consider pre-generating some initial summaries or key questions for each section using an LLM to "prime" your knowledge base.
+   * Store the structured curriculum data(all the text files) in a format accessible to your application (e.g., a simple SQLite database).
 
 ### **Phase 2: Core Agent Development**
 

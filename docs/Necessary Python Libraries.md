@@ -4,8 +4,7 @@ Here's a breakdown of useful Python libraries, categorized by their function:
 
 ### **4.1. For LLM Interaction**
 
-* google-generativeai: Essential if you plan to use Google's Gemini models for text generation, question answering, and content summarization. This is the recommended choice for Gemini API access.
-* openai: If you prefer OpenAI's GPT models, this library provides easy access to their API.
+* Local Ollama models `deepseek-coder:latest, deepseek-r1:1.5b, nomic-embed-text:latest, deepseek-r1:latest`
 
 ### **4.2. For Data Handling & NLP (Pre-processing/Analysis)**
 
@@ -18,7 +17,6 @@ Here's a breakdown of useful Python libraries, categorized by their function:
 ### **4.3. For Curriculum Parsing (if starting from raw files)**
 
 * PyPDF2 (or pypdf): To extract text content from PDF documents.
-* python-docx: To extract text content from Word (.docx) documents.
 * BeautifulSoup4 (and requests): If your curriculum content is sourced from web pages or HTML files. requests to fetch the page, BeautifulSoup4 to parse HTML.
 * textract: A unified library that attempts to extract text from many different file types (PDF, DOCX, TXT, etc.), potentially simplifying your parsing logic.
 
