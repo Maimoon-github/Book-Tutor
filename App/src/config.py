@@ -4,29 +4,28 @@ import logging
 import os
 
 # --- Project Root ---
-# This defines the absolute path to the project's root directory (the parent of 'src').
-# This is crucial for making file paths portable and not hardcoded.
+# This robustly finds the project's root directory (the parent of 'src').
+# This is crucial for making file paths work on any computer.
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # --- Model Configuration ---
 MAIN_LLM_MODEL = 'deepseek-coder:latest'
-EMBEDDING_MODEL = 'nomic-embed-text:latest'
 
 # --- Logging Configuration ---
 LOG_LEVEL = logging.INFO
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
 # --- Data File Paths ---
-# CORRECTED: All paths are now correctly and portably built relative to the PROJECT_ROOT.
-# This ensures the app can find the files regardless of where the project is located.
-CURRICULUM_DIR = os.path.join(PROJECT_ROOT, '/home/maimoon/Documents/Project Repos/Book-Tutor/App/Curriculum')
+# CORRECTED: All paths are now built portably from the project root.
+# This ensures the app can always find the curriculum files.
+CURRICULUM_DIR = os.path.join(PROJECT_ROOT, 'Curriculum')
 BOOK_INFO_PATH = os.path.join(CURRICULUM_DIR, 'book_info.txt')
 CHAPTER_READING_PATH = os.path.join(CURRICULUM_DIR, 'Chapter_Reading_matirial.txt')
 CHAPTERS_CURRICULUM_PATH = os.path.join(CURRICULUM_DIR, 'Chapters_curriculum.txt')
 EXERCISES_PATH = os.path.join(CURRICULUM_DIR, 'exercises.txt')
 
-# --- Agent Configuration for Streamlit ---
-# This prompt is the "brain" of the AI tutor.
+# --- Agent System Prompt ---
+# This is the "brain" of the AI tutor. It sets the rules and context.
 STREAMLIT_AGENT_SYSTEM_PROMPT = """
 You are an expert AI Tutor for Grade 5 English. Your personality is encouraging, patient, and laser-focused on the Student Learning Outcomes (SLOs) for the **current chapter only**.
 
