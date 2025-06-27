@@ -1,203 +1,167 @@
 import streamlit as st
-import requests
 import base64
+import io
+import soundfile as sf
+import torch
 from src.data_loader import DataLoader
 from src.agent import StreamlitTutorAgent
 
+# --- Kokoro TTS Integration ---
+# This setup is now more robust and provides clearer instructions.
+try:
+    from kokoro import KPipeline
+except ImportError:
+    st.error("Kokoro TTS library not found. Please run: pip install kokoro>=0.9.2")
+    st.stop()
+
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="AI Tutor",
-    page_icon="📖",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="AI Tutor", page_icon="📖", layout="wide", initial_sidebar_state="expanded"
 )
 
 # --- Styling ---
 st.markdown("""
 <style>
-    /* Main container styling */
-    .main .block-container {
-        padding-top: 2rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
-    /* Sidebar styling */
-    .st-emotion-cache-16txtl3 {
-        padding-top: 1.5rem;
-    }
-    /* Chapter title in sidebar */
-    .st-emotion-cache-16txtl3 a {
-        font-size: 16px;
-        border-radius: 0.5rem;
-        margin-bottom: 5px;
-    }
-    h1 {
-        font-size: 2.5em;
-        font-weight: bold;
-    }
-    h3 {
-        font-size: 1.8em;
-        color: #2c3e50;
-        border-bottom: 2px solid #2980b9;
-        padding-bottom: 10px;
-    }
-    .stButton>button {
-        border-radius: 0.5rem;
-        font-weight: bold;
-        padding: 0.5rem 1rem;
-        margin-right: 10px;
-    }
+    .main .block-container { padding: 2rem; }
+    h1 { font-size: 2.5em; font-weight: bold; }
+    h3 { font-size: 1.8em; color: #2c3e50; border-bottom: 2px solid #2980b9; padding-bottom: 10px; }
+    .stButton>button { border-radius: 0.5rem; font-weight: bold; padding: 0.5rem 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# --- Hugging Face API for Text-to-Speech ---
-HF_API_TOKEN = "YOUR_HUGGINGFACE_API_TOKEN" # IMPORTANT: Replace with your actual token
-TTS_API_URL = "https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M"
-
-def get_tts_audio(text: str):
-    """Calls the Hugging Face API to get text-to-speech audio."""
-    if not HF_API_TOKEN or HF_API_TOKEN == "YOUR_HUGGINGFACE_API_TOKEN":
-        st.error("Hugging Face API token is not configured. Cannot generate audio.")
-        return None
-
-    headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
-    payload = {"inputs": text}
+# --- Initialization (Cached for performance) ---
+@st.cache_resource
+def initialize_app():
+    """Loads all necessary resources once."""
+    data_loader = DataLoader()
+    agent = StreamlitTutorAgent(data_loader.get_all_data())
+    tts_pipeline = None
     try:
-        response = requests.post(TTS_API_URL, headers=headers, json=payload)
-        if response.status_code == 200 and response.content:
-            return response.content
-        else:
-            st.error(f"Failed to generate audio. Status: {response.status_code}, Response: {response.text}")
-            return None
+        tts_pipeline = KPipeline(lang_code='a')
     except Exception as e:
-        st.error(f"An error occurred while calling the TTS API: {e}")
+        st.warning(f"Could not initialize Kokoro TTS: {e}. Audio features will be disabled.")
+    return data_loader, agent, tts_pipeline
+
+data_loader, agent, tts_pipeline = initialize_app()
+chapter_titles = data_loader.get_chapter_titles()
+
+
+# --- Functions ---
+def get_kokoro_audio(text: str):
+    """Generates audio using the cached Kokoro pipeline."""
+    if not tts_pipeline: return None
+    try:
+        generator = tts_pipeline(text, voice='af_heart')
+        full_audio = torch.cat([audio_chunk for _, _, audio_chunk in generator]).numpy()
+        buffer = io.BytesIO()
+        sf.write(buffer, full_audio, 24000, format='WAV')
+        buffer.seek(0)
+        return buffer.read()
+    except Exception as e:
+        st.error(f"Kokoro audio generation failed: {e}")
         return None
 
 def autoplay_audio(audio_bytes: bytes):
-    """Encodes audio to base64 and uses HTML5 to autoplay it."""
+    """Embeds HTML5 audio player to autoplay sound."""
     b64 = base64.b64encode(audio_bytes).decode()
-    md = f"""
-        <audio controls autoplay="true" style="display:none;">
-        <source src="data:audio/wav;base64,{b64}" type="audio/wav">
-        </audio>
-        """
+    md = f'<audio controls autoplay="true" style="display:none;"><source src="data:audio/wav;base64,{b64}" type="audio/wav"></audio>'
     st.markdown(md, unsafe_allow_html=True)
 
 
-# --- Initialization ---
-@st.cache_resource
-def initialize_app():
-    """Initializes the data loader and agent."""
-    data_loader = DataLoader()
-    agent = StreamlitTutorAgent(data_loader.get_all_data())
-    return data_loader, agent
-
-data_loader, agent = initialize_app()
-chapter_titles = data_loader.get_chapter_titles()
-
-# --- Session State Management ---
+# --- Session State ---
 if 'current_chapter' not in st.session_state:
     st.session_state.current_chapter = None
 if 'view' not in st.session_state:
-    st.session_state.view = None # Can be 'reading' or 'exercises'
+    st.session_state.view = None
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-# --- Sidebar Navigation ---
+# --- Sidebar ---
 with st.sidebar:
     st.title("📖 Book Chapters")
-    selected_chapter_title = st.radio(
+    if not chapter_titles:
+        st.error("No chapters found. Check your `Curriculum` directory and file contents.")
+        st.stop()
+
+    # Set a default chapter if none is selected
+    if st.session_state.current_chapter is None:
+        st.session_state.current_chapter = list(chapter_titles.keys())[0]
+
+    selected_chapter_num = st.radio(
         "Select a Chapter:",
-        options=list(chapter_titles.values()),
+        options=list(chapter_titles.keys()),
+        format_func=lambda num: f"Chapter {num}: {chapter_titles[num]}",
         key="chapter_selector",
-        label_visibility="collapsed"
+        index=list(chapter_titles.keys()).index(st.session_state.current_chapter)
     )
 
-# Determine selected chapter number
-chapter_num = next((num for num, title in chapter_titles.items() if title == selected_chapter_title), None)
-
-# If selection changes, reset the view
-if st.session_state.current_chapter != chapter_num:
-    st.session_state.current_chapter = chapter_num
-    st.session_state.view = None
-    st.session_state.messages = [] # Clear chat history
+    if st.session_state.current_chapter != selected_chapter_num:
+        st.session_state.current_chapter = selected_chapter_num
+        st.session_state.view = None
+        st.session_state.messages = []
+        st.experimental_rerun()
 
 
 # --- Main Panel ---
-if chapter_num is not None:
-    chapter_data = data_loader.get_chapter_data(chapter_num)
+chapter_num = st.session_state.current_chapter
+chapter_data = data_loader.get_chapter_data(chapter_num)
 
-    st.title(f"Chapter {chapter_num}: {chapter_titles.get(chapter_num, '')}")
+st.title(f"Chapter {chapter_num}: {chapter_titles.get(chapter_num, '')}")
 
-    # --- Student Learning Outcomes (SLOs) ---
-    st.subheader("🎯 Student Learning Outcomes (SLOs)")
-    st.info(chapter_data.get('outcomes', 'No SLOs found for this chapter.'))
+st.subheader("🎯 Student Learning Outcomes (SLOs)")
+st.info(chapter_data.get('outcomes', 'No SLOs found for this chapter.'))
 
-    # --- View Selection Buttons ---
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("View Reading Material", use_container_width=True):
-            st.session_state.view = 'reading'
-    with col2:
-        if st.button("View Exercises", use_container_width=True):
-            st.session_state.view = 'exercises'
+col1, col2 = st.columns(2)
+if col1.button("View Reading Material", use_container_width=True):
+    st.session_state.view = 'reading'
+    st.experimental_rerun()  # FIXED: Force UI to update
 
-    # --- Display Content Based on View ---
-    if st.session_state.view == 'reading':
-        st.header("📚 Reading Material")
-        reading_sections = chapter_data.get('reading', {})
-        for section_title, section_content in reading_sections.items():
-            with st.expander(f"**{section_title.replace('_', ' ').title()}**", expanded=True):
-                st.markdown(section_content)
+if col2.button("View Exercises", use_container_width=True):
+    st.session_state.view = 'exercises'
+    st.experimental_rerun()  # FIXED: Force UI to update
 
-    elif st.session_state.view == 'exercises':
-        st.header("✍️ Exercises")
-        exercise_sections = chapter_data.get('exercises', {})
-        for section_title, section_content in exercise_sections.items():
-             with st.expander(f"**{section_title.replace('_', ' ').title()}**", expanded=True):
-                st.markdown(section_content)
+# Display content based on button clicks
+if st.session_state.view == 'reading':
+    st.header("📚 Reading Material")
+    for title, content in chapter_data.get('reading', {}).items():
+        with st.expander(f"**{title.replace('_', ' ').title()}**", expanded=True):
+            st.markdown(content)
 
-    # --- AI Tutor Agent ---
-    st.header("🤖 AI Tutor Assistant")
-    st.markdown("Ask me anything about the Student Learning Outcomes for this chapter!")
+elif st.session_state.view == 'exercises':
+    st.header("✍️ Exercises")
+    for title, content in chapter_data.get('exercises', {}).items():
+         with st.expander(f"**{title.replace('_', ' ').title()}**", expanded=True):
+            st.markdown(content)
 
-    # Display chat messages
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if message["role"] == "assistant" and st.button(f"🔊 Listen", key=f"tts_{message['content']}"):
+# AI Tutor Chat
+st.header("🤖 AI Tutor Assistant")
+for i, message in enumerate(st.session_state.messages):
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        if message["role"] == "assistant" and tts_pipeline:
+            if st.button("🔊 Listen", key=f"tts_{i}"):
                 with st.spinner("Generating audio..."):
-                    audio_content = get_tts_audio(message["content"])
-                    if audio_content:
-                        autoplay_audio(audio_content)
+                    audio = get_kokoro_audio(message["content"])
+                    if audio: autoplay_audio(audio)
 
-    # Chat input
-    if prompt := st.chat_input("What would you like to know?"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+if prompt := st.chat_input("Ask about the learning outcomes..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
 
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            full_response = ""
-            # Stream response from agent
-            response_stream = agent.get_response(chapter_num, prompt, st.session_state.messages)
-            for chunk in response_stream:
-                full_response += chunk
-                message_placeholder.markdown(full_response + "▌")
-            message_placeholder.markdown(full_response)
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            # Add a listen button for the new message
-            if st.button(f"🔊 Listen", key=f"tts_{full_response}"):
-                 with st.spinner("Generating audio..."):
-                    audio_content = get_tts_audio(full_response)
-                    if audio_content:
-                        autoplay_audio(audio_content)
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        full_response = ""
+        response_stream = agent.get_response(chapter_num, st.session_state.messages)
+        for chunk in response_stream:
+            full_response += chunk
+            placeholder.markdown(full_response + "▌")
+        placeholder.markdown(full_response)
 
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    st.experimental_rerun()
 
-else:
-    st.info("Select a chapter from the sidebar to get started.")
 
