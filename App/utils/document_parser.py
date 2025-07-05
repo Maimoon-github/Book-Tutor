@@ -10,7 +10,7 @@ from langchain_chroma import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
 
 # --- Constants ---
-CURRICULUM_PATH = "Curriculum/"
+CURRICULUM_PATH = "/home/maimoon/Documents/Project Repos/Book-Tutor/Curriculum"
 VECTORSTORE_PATH = "./chroma_db"
 EMBEDDING_MODEL = "nomic-embed-text"
 
@@ -80,4 +80,3 @@ def get_parsed_curriculum_content():
         content += f"--- Source: {source_path} ---\n"
         content += doc.page_content[:1000] + "\n\n" # Preview first 1000 chars
     return content if content else "No text documents found to display."
-
