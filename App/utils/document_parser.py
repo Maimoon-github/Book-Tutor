@@ -1,6 +1,5 @@
 import os
 from langchain_community.document_loaders import (
-    DirectoryLoader,
     PyPDFLoader,
     TextLoader,
     UnstructuredMarkdownLoader,
@@ -8,21 +7,37 @@ from langchain_community.document_loaders import (
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
+from typing import List
 
 # --- Constants ---
+# Use a relative path for better portability
 CURRICULUM_PATH = "/home/maimoon/Documents/Project Repos/Book-Tutor/Curriculum"
 VECTORSTORE_PATH = "./chroma_db"
 EMBEDDING_MODEL = "nomic-embed-text"
 
+def load_all_documents(path: str) -> List:
+    """
+    Loads all supported documents from a given directory path.
+    """
+    all_documents = []
+    for root, _, files in os.walk(path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            if file.endswith(".pdf"):
+                loader = PyPDFLoader(file_path)
+                all_documents.extend(loader.load())
+            elif file.endswith(".md"):
+                loader = UnstructuredMarkdownLoader(file_path)
+                all_documents.extend(loader.load())
+            elif file.endswith(".txt"):
+                loader = TextLoader(file_path)
+                all_documents.extend(loader.load())
+    return all_documents
+
+
 def get_vectorstore(rebuild: bool = False):
     """
     Loads or creates a vector store from all documents in the Curriculum directory.
-
-    Args:
-        rebuild (bool): If True, forces recreation of the vector store.
-
-    Returns:
-        A Chroma vector store instance.
     """
     embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
 
@@ -34,22 +49,9 @@ def get_vectorstore(rebuild: bool = False):
     if not os.path.exists(CURRICULUM_PATH):
         raise FileNotFoundError(f"The curriculum directory was not found at: {CURRICULUM_PATH}")
 
-    # Use DirectoryLoader to handle multiple file types
-    loader = DirectoryLoader(
-        CURRICULUM_PATH,
-        glob="**/*.*",  # Scan all subdirectories and files
-        use_multithreading=True,
-        show_progress=True,
-        loader_map={
-            ".pdf": PyPDFLoader,
-            ".md": UnstructuredMarkdownLoader,
-            ".txt": TextLoader,
-        },
-    )
-
-    documents = loader.load()
+    documents = load_all_documents(CURRICULUM_PATH)
     if not documents:
-        raise ValueError(f"No documents could be loaded from {CURRICULUM_PATH}. Check the directory and file permissions.")
+        raise ValueError(f"No documents could be loaded from {CURRICULUM_PATH}. Check the directory and file types.")
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_documents(documents)
@@ -70,13 +72,12 @@ def get_parsed_curriculum_content():
     if not os.path.exists(CURRICULUM_PATH):
         return "Curriculum directory not found."
 
-    # This uses a simple text loader for display purposes to show raw content
-    display_loader = DirectoryLoader(CURRICULUM_PATH, glob="**/*.*", loader_cls=TextLoader)
-    documents = display_loader.load()
+    documents = load_all_documents(CURRICULUM_PATH)
 
     content = ""
     for doc in documents:
-        source_path = os.path.relpath(doc.metadata['source'], CURRICULUM_PATH)
-        content += f"--- Source: {source_path} ---\n"
-        content += doc.page_content[:1000] + "\n\n" # Preview first 1000 chars
-    return content if content else "No text documents found to display."
+        source_path = doc.metadata.get('source', 'Unknown source')
+        relative_path = os.path.relpath(source_path, CURRICULUM_PATH)
+        content += f"--- Source: {relative_path} ---\n"
+        content += doc.page_content[:1000] + "\n...\n\n" # Preview first 1000 chars
+    return content if content else "No documents found to display."

@@ -26,7 +26,8 @@ def load_resources():
         tts_pipeline = pipeline("text-to-speech", model="microsoft/speecht5_tts")
         reasoner_instance = Reasoner()
         embedding_url = "https://huggingface.co/datasets/Matthijs/cmu-arctic-xvectors/resolve/main/cmu_us_slt_arctic-wav-arctic_a0001.pt"
-        speaker_embedding = torch.tensor(np.load(BytesIO(requests.get(embedding_url).content)))
+        # Allow pickle loading for the speaker embedding, as it's from a trusted source
+        speaker_embedding = torch.tensor(np.load(BytesIO(requests.get(embedding_url).content), allow_pickle=True))
         parsed_content = get_parsed_curriculum_content()
         return asr_pipeline, tts_pipeline, reasoner_instance, speaker_embedding, parsed_content
     except Exception as e:
@@ -102,7 +103,6 @@ if webrtc_ctx.state.playing and not st.session_state.audio_buffer.empty():
             st.session_state.messages.append({"role": "assistant", "content": agent_response})
 
             with st.spinner("Generating audio response..."):
-                # The TTS pipeline now handles the vocoder implicitly
                 speech = tts(agent_response, forward_params={"speaker_embeddings": speaker_embedding})
 
                 output_audio_buffer = BytesIO()

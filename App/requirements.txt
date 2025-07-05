@@ -22,6 +22,7 @@ beautifulsoup4
 streamlit-webrtc
 sentencepiece
 
-# New dependencies for directory loading and markdown parsing
+# Dependencies for the robust document parser
 unstructured
 markdown
+python-magic
