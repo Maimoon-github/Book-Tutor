@@ -1,5 +1,6 @@
 from typing import Dict, Any, List
-from langchain_ollama import Ollama
+# Corrected import path for the Ollama LLM class
+from langchain_ollama.llms import Ollama
 from memory import Memory
 from planner import generate_plan
 from executor import execute_task
