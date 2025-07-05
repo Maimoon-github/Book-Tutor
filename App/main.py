@@ -7,6 +7,8 @@ from reasoner import Reasoner
 import os
 import requests
 import torch
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, AudioProcessorBase
+import queue
 
 # --- 1. Configuration and Initialization ---
 
@@ -44,7 +46,16 @@ asr, tts, vocoder, reasoner, speaker_embedding = load_models()
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hi! How can I help you learn today? Speak into the microphone below."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hi! How can I help you learn today? Activate the microphone below to speak."}]
+
+# --- Audio Processor ---
+class AudioRecorder(AudioProcessorBase):
+    def __init__(self) -> None:
+        self.audio_queue = queue.Queue()
+
+    def recv(self, frame):
+        self.audio_queue.put(frame.to_ndarray())
+        return frame
 
 # --- 2. UI and Chat Display ---
 
@@ -56,51 +67,53 @@ for message in st.session_state.messages:
 
 # --- 3. Core Logic: Audio Processing and Agent Interaction ---
 
-audio_bytes = st.audio_recorder(
-    text="Click the microphone to speak...",
-    icon="🎤",
-    pause_threshold=2.0,
-    sample_rate=16000
+webrtc_ctx = webrtc_streamer(
+    key="audio-recorder",
+    mode=WebRtcMode.SEND_ONLY,
+    audio_processor_factory=AudioRecorder,
+    media_stream_constraints={"audio": True, "video": False},
 )
 
-if audio_bytes and all([asr, tts, vocoder, reasoner, speaker_embedding is not None]):
+if webrtc_ctx.audio_processor and not webrtc_ctx.audio_processor.audio_queue.empty() and all([asr, tts, vocoder, reasoner, speaker_embedding is not None]):
     st.info("Processing your voice...", icon="⏳")
 
-    try:
-        # Step A: Transcribe Audio to Text
-        audio_buffer = BytesIO(audio_bytes)
-        audio_data, sample_rate = sf.read(audio_buffer)
-        if audio_data.ndim > 1:
-            audio_data = np.mean(audio_data, axis=1)
+    audio_frames = []
+    while not webrtc_ctx.audio_processor.audio_queue.empty():
+        audio_frames.append(webrtc_ctx.audio_processor.audio_queue.get())
 
-        user_text = asr({"sampling_rate": sample_rate, "raw": audio_data})["text"]
+    if audio_frames:
+        audio_data = np.concatenate(audio_frames, axis=0)
 
-        if user_text:
-            st.chat_message("user").write(user_text)
-            st.session_state.messages.append({"role": "user", "content": user_text})
+        try:
+            # Step A: Transcribe Audio to Text
+            user_text = asr(audio_data, sampling_rate=16000)["text"]
 
-            # Step B: Process Text with the Reasoner
-            with st.spinner("Thinking..."):
-                agent_response = reasoner.process_query(user_text)
+            if user_text:
+                st.chat_message("user").write(user_text)
+                st.session_state.messages.append({"role": "user", "content": user_text})
 
-            # Step C: Display Agent Response
-            st.chat_message("assistant").write(agent_response)
-            st.session_state.messages.append({"role": "assistant", "content": agent_response})
+                # Step B: Process Text with the Reasoner
+                with st.spinner("Thinking..."):
+                    agent_response = reasoner.process_query(user_text)
 
-            # Step D: Convert Agent Response to Speech
-            with st.spinner("Generating audio response..."):
-                speech = tts(agent_response, forward_params={"speaker_embeddings": speaker_embedding})
-                speech_with_vocoder = vocoder(speech['spectrogram'])
+                # Step C: Display Agent Response
+                st.chat_message("assistant").write(agent_response)
+                st.session_state.messages.append({"role": "assistant", "content": agent_response})
 
-                output_audio_buffer = BytesIO()
-                sf.write(output_audio_buffer, speech_with_vocoder["audio"], samplerate=16000, format='WAV')
-                output_audio_buffer.seek(0)
-                st.audio(output_audio_buffer, format='audio/wav')
+                # Step D: Convert Agent Response to Speech
+                with st.spinner("Generating audio response..."):
+                    speech = tts(agent_response, forward_params={"speaker_embeddings": speaker_embedding})
+                    speech_with_vocoder = vocoder(speech['spectrogram'])
 
-                st.rerun()
+                    output_audio_buffer = BytesIO()
+                    sf.write(output_audio_buffer, speech_with_vocoder["audio"], samplerate=16000, format='WAV')
+                    output_audio_buffer.seek(0)
+                    st.audio(output_audio_buffer, format='audio/wav')
 
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+                    st.rerun()
+
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
 
 # --- 4. Sidebar Information ---
 with st.sidebar:
@@ -128,4 +141,12 @@ with st.sidebar:
             except OSError as e:
                 st.error(f"Error removing memory file: {e}")
         st.rerun()
+# ```
 
+# ### Summary of Changes and Required Actions
+
+# 1.  **Rename `transformers.py`**: On your machine, please rename the `transformers.py` file to avoid import conflicts.
+# 2.  **Updated `main.py`**: I have updated `main.py` to use `streamlit-webrtc`'s `webrtc_streamer`, which is a more stable way to handle audio input.
+# 3.  **Check `requirements.txt`**: Ensure that `streamlit-webrtc` is listed in your `requirements.txt` file and that you have run `pip install -r requirements.txt` to install it.
+
+# After making these changes, your application should run without the import and attribute errors. Let me know if you have any other questio
