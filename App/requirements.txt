@@ -1,6 +1,14 @@
 streamlit>=1.10.0
-langchain>=0.1.0
 langgraph
+
+# Main community package for integrations
+langchain-community
+
+# Backend packages for specific tools
+langchain-ollama
+langchain-chroma
+
+# Core dependencies
 ollama
 chromadb
 pypdf
@@ -13,7 +21,3 @@ requests
 beautifulsoup4
 streamlit-webrtc
 sentencepiece
-
-# New packages to resolve deprecation warnings
-langchain-ollama
-langchain-chroma

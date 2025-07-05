@@ -2,7 +2,8 @@ import os
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
+# Corrected import path to use langchain_community as the stable entry point
+from langchain_community.embeddings import OllamaEmbeddings
 
 # --- Constants ---
 PDF_PATH = "Curriculum/thiswayEnglishBook-5-2020 - Punjab -20.01.22.pdf"
