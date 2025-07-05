@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from langchain_community.llms import Ollama
+from langchain_ollama import Ollama
 from memory import Memory
 from planner import generate_plan
 from executor import execute_task
@@ -7,9 +7,9 @@ from executor import execute_task
 class Reasoner:
     """
     The "brain" of the agent, responsible for orchestrating the other modules.
-    It now constructs a specific prompt for RAG-based questions.
+    It now uses the 'deepseek-r1' model for reasoning.
     """
-    def __init__(self, model_name: str = "llama3"):
+    def __init__(self, model_name: str = "deepseek-r1"):
         self.llm = Ollama(model=model_name)
         self.memory = Memory()
 
@@ -24,18 +24,14 @@ class Reasoner:
         self.memory.add("user", user_query)
         plan = generate_plan(user_query)
 
-        # If the plan is just a general statement, we don't need to execute a tool.
         if plan and plan[0].get("action") == "general_statement":
-            # A simple conversational reply
             final_response = self._generate_response(f"The user said: '{user_query}'. Respond conversationally.")
             self.memory.add("agent", final_response)
             return final_response
 
-        # Execute the plan (which should be a RAG search)
         execution_results = [execute_task(task) for task in plan]
         retrieved_context = execution_results[0] if execution_results else "No context found."
 
-        # Construct a specialized prompt for the RAG task
         prompt = f"""
         You are an expert tutor. Your goal is to teach a student based on the provided curriculum context.
         A student has asked the following question: "{user_query}"

@@ -10,8 +10,6 @@ import torch
 from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, WebRtcMode
 from utils.pdf_parser import get_parsed_pdf_content
 import queue
-import threading
-import time
 
 # --- 1. Configuration and Initialization ---
 st.set_page_config(page_title="Agentic AI Tutor", page_icon="🤖", layout="wide")
@@ -49,7 +47,6 @@ class AudioRecorder(AudioProcessorBase):
         self.audio_queue = st.session_state.audio_buffer
 
     def recv(self, frame):
-        # Using a thread-safe queue to handle audio frames
         self.audio_queue.put(frame.to_ndarray())
         return frame
 
@@ -58,16 +55,15 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.header("Conversation")
-    # Display chat messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
 with col2:
     st.header("Curriculum")
-    with st.expander("View Parsed Textbook Content", expanded=False):
+    with st.expander("View Parsed Textbook Content", expanded=True):
         if pdf_content:
-            st.text_area("PDF Content", pdf_content, height=400)
+            st.text_area("PDF Content (First 5 Pages)", pdf_content, height=400)
         else:
             st.warning("Could not load PDF content.")
 
@@ -77,7 +73,7 @@ webrtc_ctx = webrtc_streamer(
     mode=WebRtcMode.SENDONLY,
     audio_processor_factory=AudioRecorder,
     media_stream_constraints={"audio": True, "video": False},
-    send_interval=200, # ms
+    # The 'send_interval' argument was removed to fix the TypeError
 )
 
 if webrtc_ctx.state.playing and not st.session_state.audio_buffer.empty():
@@ -89,13 +85,10 @@ if webrtc_ctx.state.playing and not st.session_state.audio_buffer.empty():
 
     if all_frames:
         audio_data = np.concatenate(all_frames, axis=0)
-
-        # Write audio to a buffer and process
         buffer = BytesIO()
         sf.write(buffer, audio_data, 16000, format='WAV')
         buffer.seek(0)
 
-        # Transcribe
         user_text = asr(buffer.read())["text"]
 
         if user_text:
@@ -117,7 +110,6 @@ if webrtc_ctx.state.playing and not st.session_state.audio_buffer.empty():
                 sf.write(output_audio_buffer, speech_with_vocoder["audio"], samplerate=16000, format='WAV')
                 st.audio(output_audio_buffer, format='audio/wav', autoplay=True)
 
-            # Clear the queue after processing
             with st.session_state.audio_buffer.mutex:
                 st.session_state.audio_buffer.queue.clear()
 
