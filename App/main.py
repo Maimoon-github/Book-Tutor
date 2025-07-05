@@ -8,7 +8,8 @@ import os
 import requests
 import torch
 from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, WebRtcMode
-from utils.pdf_parser import get_parsed_pdf_content
+# Updated import to use the new robust document parser
+from utils.document_parser import get_parsed_curriculum_content
 import queue
 
 # --- 1. Configuration and Initialization ---
@@ -21,18 +22,18 @@ st.caption("A voice-driven, agentic AI tutor powered by your curriculum.")
 def load_resources():
     try:
         asr_pipeline = pipeline("automatic-speech-recognition", model="openai/whisper-base")
+        # The TTS pipeline now handles the vocoder internally for better stability
         tts_pipeline = pipeline("text-to-speech", model="microsoft/speecht5_tts")
-        vocoder = pipeline("text-to-speech", model="microsoft/speecht5_hifigan")
         reasoner_instance = Reasoner()
         embedding_url = "https://huggingface.co/datasets/Matthijs/cmu-arctic-xvectors/resolve/main/cmu_us_slt_arctic-wav-arctic_a0001.pt"
         speaker_embedding = torch.tensor(np.load(BytesIO(requests.get(embedding_url).content)))
-        parsed_pdf = get_parsed_pdf_content()
-        return asr_pipeline, tts_pipeline, vocoder, reasoner_instance, speaker_embedding, parsed_pdf
+        parsed_content = get_parsed_curriculum_content()
+        return asr_pipeline, tts_pipeline, reasoner_instance, speaker_embedding, parsed_content
     except Exception as e:
         st.error(f"Fatal error during resource loading: {e}")
-        return (None,) * 6
+        return (None,) * 5
 
-asr, tts, vocoder, reasoner, speaker_embedding, pdf_content = load_resources()
+asr, tts, reasoner, speaker_embedding, curriculum_content = load_resources()
 
 # --- Session State Initialization ---
 if "messages" not in st.session_state:
@@ -61,11 +62,11 @@ with col1:
 
 with col2:
     st.header("Curriculum")
-    with st.expander("View Parsed Textbook Content", expanded=True):
-        if pdf_content:
-            st.text_area("PDF Content (First 5 Pages)", pdf_content, height=400)
+    with st.expander("View Parsed Curriculum Content", expanded=True):
+        if curriculum_content:
+            st.text_area("Curriculum Preview", curriculum_content, height=400)
         else:
-            st.warning("Could not load PDF content.")
+            st.warning("Could not load curriculum content.")
 
 # --- 3. Core Logic ---
 webrtc_ctx = webrtc_streamer(
@@ -73,7 +74,6 @@ webrtc_ctx = webrtc_streamer(
     mode=WebRtcMode.SENDONLY,
     audio_processor_factory=AudioRecorder,
     media_stream_constraints={"audio": True, "video": False},
-    # The 'send_interval' argument was removed to fix the TypeError
 )
 
 if webrtc_ctx.state.playing and not st.session_state.audio_buffer.empty():
@@ -102,12 +102,11 @@ if webrtc_ctx.state.playing and not st.session_state.audio_buffer.empty():
             st.session_state.messages.append({"role": "assistant", "content": agent_response})
 
             with st.spinner("Generating audio response..."):
+                # The TTS pipeline now handles the vocoder implicitly
                 speech = tts(agent_response, forward_params={"speaker_embeddings": speaker_embedding})
-                with st.spinner("Improving audio quality..."):
-                     speech_with_vocoder = vocoder(speech['spectrogram'])
 
                 output_audio_buffer = BytesIO()
-                sf.write(output_audio_buffer, speech_with_vocoder["audio"], samplerate=16000, format='WAV')
+                sf.write(output_audio_buffer, speech["audio"], samplerate=16000, format='WAV')
                 st.audio(output_audio_buffer, format='audio/wav', autoplay=True)
 
             with st.session_state.audio_buffer.mutex:
@@ -125,8 +124,8 @@ with st.sidebar:
         st.rerun()
 
     if st.button("Rebuild Vector Store"):
-        with st.spinner("Rebuilding vector store from PDF... This may take a moment."):
-            from utils.pdf_parser import get_vectorstore
+        with st.spinner("Rebuilding vector store from all curriculum files..."):
+            from utils.document_parser import get_vectorstore
             get_vectorstore(rebuild=True)
         st.success("Vector store rebuilt!")
 

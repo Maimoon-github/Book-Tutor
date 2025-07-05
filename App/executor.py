@@ -1,7 +1,8 @@
 import re
 from typing import Dict, Any
 from fetcher import fetch_and_parse
-from utils.pdf_parser import get_vectorstore
+# Updated import to use the new robust document parser
+from utils.document_parser import get_vectorstore
 
 # Initialize the RAG retriever from our vector store
 try:
@@ -14,12 +15,6 @@ except Exception as e:
 def execute_task(task: Dict[str, Any]) -> Any:
     """
     Executes a single task from a plan.
-
-    Args:
-        task: A dictionary containing the action to perform and its parameters.
-
-    Returns:
-        The result of the executed task.
     """
     action = task.get("action")
     parameters = task.get("parameters", {})
@@ -36,9 +31,7 @@ def execute_task(task: Dict[str, Any]) -> Any:
             return "Error: No question provided for RAG search."
 
         try:
-            # Retrieve relevant documents from the PDF
             docs = rag_retriever.get_relevant_documents(question)
-            # Combine the content of the retrieved documents
             result = "\n\n---\n\n".join([doc.page_content for doc in docs])
         except Exception as e:
             result = f"Error during RAG search: {e}"
