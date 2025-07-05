@@ -6,7 +6,7 @@ from langchain_chroma import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
 
 # --- Constants ---
-PDF_PATH = "Curriculum/thiswayEnglishBook-5-2020 - Punjab -20.01.22.pdf"
+PDF_PATH = "/home/maimoon/Documents/Project Repos/Book-Tutor/Curriculum"
 VECTORSTORE_PATH = "./chroma_db"
 # Use the specified embedding model
 EMBEDDING_MODEL = "nomic-embed-text"

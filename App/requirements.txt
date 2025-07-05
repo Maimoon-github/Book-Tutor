@@ -21,3 +21,7 @@ requests
 beautifulsoup4
 streamlit-webrtc
 sentencepiece
+
+# New dependencies for directory loading and markdown parsing
+unstructured
+markdown
