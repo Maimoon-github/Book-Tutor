@@ -1,0 +1,14 @@
+streamlit
+langchain
+langgraph
+ollama
+chromadb
+pypdf
+sentence-transformers
+transformers
+torch
+torchaudio
+soundfile
+requests
+beautifulsoup4
+streamlit-webrtc
