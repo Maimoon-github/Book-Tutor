@@ -1,5 +1,4 @@
-from typing import Dict, Any, List
-# Corrected import path to use langchain_community
+from typing import Dict, Any
 from langchain_community.llms import Ollama
 from memory import Memory
 from planner import generate_plan
@@ -7,8 +6,7 @@ from executor import execute_task
 
 class Reasoner:
     """
-    The "brain" of the agent, responsible for orchestrating the other modules.
-    It now uses the 'deepseek-r1' model for reasoning.
+    The "brain" of the agent, now accepts a retriever for each query.
     """
     def __init__(self, model_name: str = "deepseek-r1"):
         self.llm = Ollama(model=model_name)
@@ -21,7 +19,10 @@ class Reasoner:
             print(f"Error invoking LLM: {e}")
             return "Sorry, I'm having trouble connecting to my brain right now."
 
-    def process_query(self, user_query: str) -> str:
+    def process_query(self, user_query: str, rag_retriever) -> str:
+        """
+        Processes a user's query using the provided RAG retriever.
+        """
         self.memory.add("user", user_query)
         plan = generate_plan(user_query)
 
@@ -30,7 +31,8 @@ class Reasoner:
             self.memory.add("agent", final_response)
             return final_response
 
-        execution_results = [execute_task(task) for task in plan]
+        # Pass the session-specific retriever to the executor
+        execution_results = [execute_task(task, rag_retriever) for task in plan]
         retrieved_context = execution_results[0] if execution_results else "No context found."
 
         prompt = f"""

@@ -1,28 +1,27 @@
-streamlit>=1.10.0
-langgraph
+# --- Core Frameworks ---
+streamlit>=1.33.0
+streamlit-webrtc>=0.47.0
 
-# Main community package for integrations
-langchain-community
+# --- Language Model & Agent Frameworks ---
+langgraph>=0.0.48
+langchain-community>=0.0.38
+langchain-chroma>=0.1.0
+langchain-ollama>=0.1.4
 
-# Backend packages for specific tools
-langchain-ollama
-langchain-chroma
-
-# Core dependencies
-ollama
-chromadb
-pypdf
-sentence-transformers
+# --- Core AI/ML Libraries ---
 transformers>=4.38.0
-torch
-torchaudio
-soundfile
-requests
-beautifulsoup4
-streamlit-webrtc
-sentencepiece
+torch>=2.3.0
+torchaudio>=2.3.0
+sentence-transformers>=2.2.2
+sentencepiece>=0.1.99
 
-# Dependencies for the robust document parser
-unstructured
-markdown
-python-magic
+# --- Data & File Processing ---
+pypdf>=4.0.0
+unstructured[md]>=0.12.0
+python-magic>=0.4.27
+chromadb>=0.4.24
+soundfile>=0.12.1
+
+# --- Web & Utilities ---
+requests>=2.31.0
+beautifulsoup4>=4.12.3
