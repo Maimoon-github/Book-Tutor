@@ -16,7 +16,7 @@ This section details the core technologies underpinning the AI Tutor, explaining
 *   **Role**: CrewAI will be utilized to orchestrate autonomous agents that collaborate to fulfill tutoring tasks.
 *   **How it enables agency**:
     *   **Agent Definition**: Defining specialized agents (e.g., `LessonPlannerAgent`, `QuestionGeneratorAgent`, `FeedbackProviderAgent`) with distinct roles, goals, and tools.
-    *   **Task Management**: Assigning specific tasks to agents (e.g., 
+    *   **Task Management**: Assigning specific tasks to agents (e.g.,
 
 
 analyzing student input, generating explanations, creating exercises).
@@ -149,5 +149,3 @@ This section details the phased approach to developing and deploying the AI Tuto
 
 *   Summary of the project's potential impact.
 *   Call to action for further development or collaboration.
-
-
