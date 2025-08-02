@@ -1,0 +1,20 @@
+# Core dependencies
+streamlit>=1.26.0
+langchain>=0.0.320
+crewai>=0.28.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# Vector database for knowledge storage
+chromadb>=0.4.18
+
+# For graph-based workflows
+langgraph>=0.0.17
+
+# UI and visualization
+matplotlib>=3.7.2
+plotly>=5.17.0
+
+# Utilities
+tqdm>=4.66.1
+pydantic>=2.4.2
